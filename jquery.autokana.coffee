@@ -1,0 +1,143 @@
+global = Function('return this')()
+
+class AutoKana
+  kana_extraction_pattern: new RegExp('[^ 　ぁあ-んー]', 'g')
+  kana_compacting_pattern: new RegExp('[ぁぃぅぇぉっゃゅょ]', 'g')
+
+  constructor: (element1, element2)->
+    element1 = '#' + element1 unless element1.match(/^#/)
+    element2 = '#' + element2 unless element2.match(/^#/)
+    @elName = $(element1)
+    @elKana = $(element2)
+    defaultOptions  = {
+      build:    true
+      katakana: false
+    }
+    @options = $.extend defaultOptions, arguments[2] || {}
+    @active  = true
+    @_stateClear()
+    @_build()
+  start: ()->
+    @active = true
+    return
+  stop: ()->
+    @active = false
+    return
+  toggle: (event)->
+    ev = event || window.event
+    if event
+      el = Event.element(event)
+      if el.checked
+        @active = true;
+      else
+        @active = false;
+    else
+      @active = !@active;
+    return
+  _addEvents: ()->
+    @elName.on 'blur', ()=>
+      @_eventBlur @
+    @elName.on 'focus', ()=>
+      @_eventFocus @
+    @elName.on 'keydown', ()=>
+      @_eventKeyDown @
+    return
+  _build: ()->
+    if @options.build
+      @_addEvents()
+    return
+  _checkConvert: (new_values)->
+    if !@flagConvert
+      if Math.abs(@values.length - new_values.length) > 1
+        tmp_values = new_values.join('').replace(@kana_compacting_pattern, '').split('')
+        if Math.abs(@values.length - tmp_values.length) > 1
+          @_stateConvert();
+      else
+        if @values.length == @input.length && @values.join('') != @input
+          @_stateConvert();
+    return
+  _checkValue: ()->
+    new_input = @elName.val()
+    if new_input == ''
+      @_stateClear()
+      @_setKana()
+    else
+      new_input = @_removeString(new_input);
+      if this.input == new_input
+        return;
+      else
+        @input = new_input;
+        if !@flagConvert
+          new_values = new_input.replace(@kana_extraction_pattern, '').split('');
+          @_checkConvert(new_values)
+          @_setKana(new_values);
+    return
+  _clearInterval: ()->
+    clearInterval @timer
+    return
+  _eventBlur: (t)->
+    t._clearInterval()
+    return
+  _eventFocus: (t)->
+    t._stateInput()
+    t._setInterval()
+    return
+  _eventKeyDown: (t)->
+    if t.flagConvert
+      t._stateInput()
+    return
+  _isHiragana: (char)->
+    ((char >= 12353 && char <= 12435) || char == 12445 || char == 12446)
+  _removeString: (new_input)->
+    if new_input.match(@ignoreString)
+      return new_input.replace(@ignoreString, '')
+    else
+      ignoreArray   = @ignoreString.split('')
+      inputArray    = new_input.split('')
+      for i in [0..ignoreArray.length - 1]
+        if ignoreArray[i] == inputArray[i]
+          inputArray[i] = '';
+      return inputArray.join('');
+  _setInterval: ()->
+    @timer = setInterval ()=>
+       @_checkValue()
+    , 30
+    return
+  _setKana: (new_values)->
+    if !@flagConvert
+      if new_values
+        @values = new_values;
+      if @active
+        @elKana.val(@_toKatakana(@baseKana + @values.join('')))
+    return
+  _stateClear: ()->
+    @baseKana       = ''
+    @flagConvert    = false
+    @ignoreString   = ''
+    @input          = ''
+    @values         = []
+    return
+  _stateInput: ()->
+    @baseKana       = @elKana.val()
+    @flagConvert    = false
+    @ignoreString   = @elName.val()
+    return
+  _stateConvert: ()->
+    @baseKana       = @baseKana + @values.join('')
+    @flagConvert    = true
+    @values         = []
+    return
+  _toKatakana: (src)->
+    if @options.katakana
+      str = new String;
+      for i in [0..src.length - 1]
+        c = src.charCodeAt(i);
+        if @_isHiragana(c)
+          str += String.fromCharCode(c + 96)
+        else
+          str += src.charAt(i)
+      return str;
+    else
+      return src;
+
+global.AutoKana = AutoKana
